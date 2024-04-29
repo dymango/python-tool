@@ -2,3 +2,4 @@
 /randomnumber/dist/
 /tool/build/
 /tool/dist/
+*.spec
