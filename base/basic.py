@@ -141,3 +141,11 @@ print(f(2, 4))
 
 print('aaa {s} {num}')
 print(f'aaa {s} {num}')
+
+
+def my_function():
+    """1231241No1412"""
+    q = 1
+
+
+print(my_function.__doc__)

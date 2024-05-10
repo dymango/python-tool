@@ -1,6 +1,7 @@
 import tkinter as tk
 from functools import partial
 from tkinter import messagebox
+import logging
 
 from numberpool import NumberPoolCache
 
@@ -34,8 +35,12 @@ def add_action(entry, show_label):
         return
     result = add_element(newValue)
     if result:
+        logging.info("add value succeed")
         entry.delete(0, 'end')
         show_label.config(text=all_element())
+    else:
+        logging.warning("add value failed")
+
 
 
 def delete_action(entry, show_label):

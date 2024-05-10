@@ -4,7 +4,6 @@ import random
 
 
 class NumberPool:
-    __numbers = []
 
     def __init__(self, numbers):
         self.__numbers = numbers
