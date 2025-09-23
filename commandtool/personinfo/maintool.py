@@ -1,5 +1,8 @@
 import argparse
 
+cache = {}
+
+
 def main():
     # 创建一个 ArgumentParser 对象
     parser = argparse.ArgumentParser(description='这是一个命令行参数解析示例。')
@@ -11,12 +14,29 @@ def main():
 
     # 添加命令行选项（也称为标志）
 
-
     # 解析命令行参数和选项
     args = parser.parse_args()
 
     # 使用命令行参数和选项
-    print(args.action, args.key, args.value)
+    action = args.action
+    key = args.key
+    value = args.value
+
+    if key is None:
+        print("key miss")
+        return
+
+    if action == "set":
+        if value is None:
+            print("value miss")
+            return
+        cache[key] = value
+        print("set key" + key + "," + value)
+    elif action == "get":
+        if key in cache:
+            print(cache[key])
+        else:
+            print("key not exist")
 
 
 if __name__ == '__main__':

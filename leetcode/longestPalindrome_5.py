@@ -26,7 +26,7 @@ class Solution:
         length = len(s)
         maxL = 0
         resultStr = ""
-        arr = [[None]*length for _ in range(length)]
+        arr = [[None] * length for _ in range(length)]
         for winWidth in range(0, length):
             for winStart in range(0, length):
                 start = winStart - winWidth
