@@ -1,66 +1,149 @@
-from datetime import datetime, time
+# order_exporter.py
+import os
+import time as totalTime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, time, timedelta
 
 import mysql.connector
 import pandas as pd
-from mysql.connector import errorcode
+import pytz
 
-from Models import (
+from models import (
     Order, Customer, OrderItem, OrderChargeItem, OrderCharge,
-    OrderRestaurant, OrderPayment, StripePaymentIntent,
-    OrderAddress, OrderHDRAddress, OrderLocation, OrderLine
+    OrderPayment, StripePaymentIntent,
+    OrderAddress, OrderLine, OrderFlag
 )
 
-# Obtain connection string information from the portal
-
-config = {
-    'host': 'rfprodv2-flexible-wonder-db-replica-v4.mysql.database.azure.com',
-    'user': 'xxx',
-    'password': 'xxx'
+db_config = {
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'pool_name': 'custom_connection_pool',
+    'pool_size': 10
 }
 
+output_dir = os.getenv('OUTPUT_DIR', '/app/export_results')
 
-# Construct connection string
-def export():
+
+def export_single_day(current_date):
+    print(f"开始处理日期: {current_date.strftime('%Y-%m-%d')}")
+
+    conn = None
     try:
-        conn = mysql.connector.connect(**config)
-        print("Connection established")
+        print(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接已建立")
+        conn = mysql.connector.connect(pool_name='custom_connection_pool')
+        process_single_day(conn, current_date)
     except mysql.connector.Error as err:
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            print("Something is wrong with the user name or password")
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            print("Database does not exist")
-        else:
-            print(err)
-    else:
-        cursor = conn.cursor(dictionary=True)
-        date = datetime(2025, 9, 23)
-        start_of_day = datetime.combine(date.date(), time.min)  # 00:00:00
-        end_of_day = datetime.combine(date.date(), time.max)
-        searchOrderSql = """
-        SELECT id, user_id, order_channel, dining_option, created_time, status, remake_ref_order_id
-            FROM `order`.orders
-            WHERE id='0ac3a3a0-6b93-4724-8f5d-4312f9ed5763'
-            LIMIT 1
-        """
-        # Read data
-        cursor.execute(searchOrderSql)
-        rows = cursor.fetchall()
-        print("Read", cursor.rowcount, "row(s) of data.")
-
-        # Print all rows
-        for row in rows:
-            print(row.__repr__())
-            lines = order_lines(Order(**row), cursor)
-            for l in lines:
-                print(l.__repr__())
-            export_to_excel(lines, "test.csv")
-            # Cleanup
-            conn.commit()
-            print("Done.")
-
+        print(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接失败: {err}")
+        return False
     finally:
-        cursor.close()
-        conn.close()
+        if conn:
+            conn.close()
+
+
+def process_single_day(conn, current_date):
+    s = totalTime.time()
+    try:
+
+        timezone = pytz.timezone('America/New_York')
+        start_of_day_ny = timezone.localize(
+            datetime.combine(current_date, time.min)
+        )
+        end_of_day_ny = timezone.localize(
+            datetime.combine(current_date, time.max)
+        )
+
+        start_of_day_utc = start_of_day_ny.astimezone(pytz.UTC)
+        end_of_day_utc = end_of_day_ny.astimezone(pytz.UTC)
+        totalLines = []
+        skip = 0
+
+        while True:
+            with conn.cursor(dictionary=True) as cursor:
+                searchOrderSql = """
+                                    SELECT id, user_id, order_channel, dining_option, created_time, status, remake_ref_order_id
+                                        FROM `order`.orders
+                                        WHERE created_time >= %s AND created_time <= %s
+                                        AND brand_category = 'BLUE_APRON'
+                                        AND order_channel IN ('BA_APP', 'BA_WEB')
+                                        AND status in ('CANCELED', 'COMPLETE')
+                                        LIMIT 100 OFFSET %s
+                                    """
+                cursor.execute(searchOrderSql, (start_of_day_utc, end_of_day_utc, skip))
+                rows = cursor.fetchall()
+                if len(rows) == 0:
+                    break
+
+                for row in rows:
+                    try:
+                        lines = order_lines(Order(**row), cursor)
+                        totalLines.extend(lines)
+                    except Exception as e:
+                        print(f"{current_date.strftime('%Y-%m-%d')} - 处理订单错误: {e}")
+
+                skip += 100
+
+        if totalLines:
+            filename = f"orders_{current_date.strftime('%Y-%m-%d')}.csv"
+            filepath = os.path.join(output_dir, filename)
+            export_to_excel(totalLines, filepath)
+            print(f"{current_date.strftime('%Y-%m-%d')} - 导出完成: {len(totalLines)} 条记录")
+        else:
+            print(f"{current_date.strftime('%Y-%m-%d')} - 无数据")
+
+        e = totalTime.time()
+        print(f"{current_date.strftime('%Y-%m-%d')} - 处理完成, 耗时: {e - s: .2f} 秒")
+        return True
+
+    except Exception as e:
+        print(f"{current_date.strftime('%Y-%m-%d')} - 处理过程中发生错误: {e}")
+        return False
+
+
+def export_with_threadpool():
+    start = totalTime.time()
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    start_date = datetime(2025, 8, 11)
+    end_date = datetime(2025, 9, 30)
+
+    dates_to_process = []
+    current_date = start_date
+    while current_date <= end_date:
+        dates_to_process.append(current_date)
+        current_date += timedelta(days=1)
+
+    print(f"开始处理 {len(dates_to_process)} 天的数据")
+
+    max_workers = min(5, len(dates_to_process))
+    successful_days = 0
+    failed_days = 0
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_date = {
+            executor.submit(export_single_day, date): date
+            for date in dates_to_process
+        }
+
+        for future in as_completed(future_to_date):
+            date = future_to_date[future]
+            try:
+                result = future.result()
+                if result:
+                    successful_days += 1
+                else:
+                    failed_days += 1
+            except Exception as e:
+                print(f"{date.strftime('%Y-%m-%d')} - 线程执行异常: {e}")
+                failed_days += 1
+
+    end = totalTime.time()
+    print(f"\n=== 处理完成 ===")
+    print(f"总天数: {len(dates_to_process)}")
+    print(f"成功: {successful_days} 天")
+    print(f"失败: {failed_days} 天")
+    print(f"总耗时: {end - start: .2f} 秒")
 
 
 def order_lines(order: Order, cursor):
@@ -73,8 +156,6 @@ def order_lines(order: Order, cursor):
     customer_data = cursor.fetchone()
     customer = Customer(**customer_data)
 
-    print("customer done")
-
     # order_items
     cursor.execute("""
         SELECT id, menu_item_name, order_quantity, restaurant_id
@@ -82,7 +163,6 @@ def order_lines(order: Order, cursor):
         WHERE order_id=%s AND NOT deleted
     """, (order.id,))
     order_items = [OrderItem(**row) for row in cursor.fetchall()]
-    print("order_items done")
     # order_charge_items
     cursor.execute("""
         SELECT order_item_id, subtotal, adjust_subtotal, discount, promotion, membership_subtotal, subscription_save_discount
@@ -90,7 +170,6 @@ def order_lines(order: Order, cursor):
         WHERE order_id=%s
     """, (order.id,))
     order_charge_items = [OrderChargeItem(**row) for row in cursor.fetchall()]
-    print("order_charge_items done")
     # order_charge
     cursor.execute("""
         SELECT final_amount
@@ -98,15 +177,7 @@ def order_lines(order: Order, cursor):
         WHERE order_id=%s
     """, (order.id,))
     order_charge = OrderCharge(**cursor.fetchone())
-    print("order_charge done")
-    # order_restaurants
-    cursor.execute("""
-        SELECT restaurant_id, restaurant_name
-        FROM order.order_restaurants
-        WHERE order_id=%s
-    """, (order.id,))
-    order_restaurants = [OrderRestaurant(**row) for row in cursor.fetchall()]
-    print("order_restaurants done")
+
     # order_payments
     cursor.execute("""
         SELECT id, payment_method, credit_card_id, account_number, brand, revised_auth_amount, capture_amount, refund_amount
@@ -114,7 +185,6 @@ def order_lines(order: Order, cursor):
         WHERE order_id=%s
     """, (order.id,))
     order_payments = [OrderPayment(**row) for row in cursor.fetchall()]
-    print("order_payments done")
     # stripe_payment_intents
     psp_payment_ids = [p.id for p in order_payments if p.payment_method in ('APPLE_PAY', 'GOOGLE_PAY')]
     if psp_payment_ids:
@@ -136,40 +206,32 @@ def order_lines(order: Order, cursor):
     """, (order.id,))
     addr_row = cursor.fetchone()
     order_address = OrderAddress(**addr_row) if addr_row else None
-    print("order_address done")
-    # order_hdr_address
-    cursor.execute("""
-        SELECT address2
-        FROM order.order_hdr_addresses
-        WHERE order_id=%s
-    """, (order.id,))
-    order_hdr_address = OrderHDRAddress(**cursor.fetchone())
-    print("order_hdr_address done")
-    # order_location
-    cursor.execute("""
-        SELECT address_line1, city, state_code, zip_code
-        FROM order.order_locations
-        WHERE order_id=%s
-    """, (order.id,))
-    order_location = OrderLocation(**cursor.fetchone())
-    print("order_location done")
-    # 构造 order_lines
+
     result = []
+
+    order_flags = []
+    if order.status == 'CANCELED':
+        cursor.execute("""
+                        SELECT order_id, action, created_by
+                        FROM order.order_flags
+                        WHERE order_id = %s AND action = 'BO_CANCEL'
+                    """, (order.id,))
+
+        flags_data = cursor.fetchall()
+        order_flags = [OrderFlag(**row) for row in flags_data]
+
     for item in order_items:
         charge_item = next(oci for oci in order_charge_items if oci.order_item_id == item.id)
-        restaurant = next(r for r in order_restaurants if r.restaurant_id == item.restaurant_id)
         line = OrderLine(
             order=order,
             customer=customer,
             order_item=item,
             order_charge_item=charge_item,
             order_charge=order_charge,
-            order_restaurant=restaurant,
             order_payments=order_payments,
             stripe_payment_intents=stripe_payment_intents,
             order_address=order_address,
-            order_hdr_address=order_hdr_address,
-            order_location=order_location
+            order_flags=order_flags
         )
         result.append(line)
 
@@ -177,35 +239,28 @@ def order_lines(order: Order, cursor):
 
 
 def order_line_to_dict(order_line):
-    """按照Scala代码的映射逻辑将OrderLine对象转换为字典"""
-
     def safe_get(attr_path, default=""):
-        """安全获取嵌套属性"""
         try:
             value = order_line
             for attr in attr_path.split('.'):
                 if value is None:
                     return default
                 value = getattr(value, attr, None)
-            return value if value is not None else default
+            return default if value is None else value
         except (AttributeError, IndexError, TypeError):
             return default
 
     def refundable_subtotal(charge_item):
-        """计算可退款金额（模拟Scala中的refundableSubtotal方法）"""
         if not charge_item:
             return ""
-        # 这里需要根据实际业务逻辑实现，暂时返回subtotal
-        return str(charge_item.subtotal) if charge_item.subtotal else ""
+        return str(charge_item.subtotal) if charge_item.subtotal is not None else ""
 
-    # 查找支付方式
     def find_payment(method):
         for payment in (order_line.order_payments or []):
             if payment.payment_method == method:
                 return payment
         return None
 
-    # 查找Stripe支付token
     def find_stripe_token(payment_id):
         for stripe_payment in (order_line.stripe_payment_intents or []):
             if stripe_payment.payment_id == payment_id:
@@ -219,14 +274,12 @@ def order_line_to_dict(order_line):
     google_pay_token = find_stripe_token(google_pay.id) if google_pay else ""
     apple_pay_token = find_stripe_token(apple_pay.id) if apple_pay else ""
 
-    # 地址处理逻辑（按照Scala代码的优先级）
-    address_line1 = safe_get('order_address.address_line') or safe_get('order_location.address_line1')
-    address_line2 = safe_get('order_address.unit_number_or_company') or safe_get('order_hdr_address.address2')
-    city = safe_get('order_address.city') or safe_get('order_location.city')
-    state = safe_get('order_address.state') or safe_get('order_location.state_code')
-    zip_code = safe_get('order_address.zip_code') or safe_get('order_location.zip_code')
+    address_line1 = safe_get('order_address.address_line') or ''
+    address_line2 = safe_get('order_address.unit_number_or_company') or ''
+    city = safe_get('order_address.city') or ''
+    state = safe_get('order_address.state') or ''
+    zip_code = safe_get('order_address.zip_code') or ''
 
-    # 按照Scala代码的顺序构建字典
     data = {
         "accountOwner.accountId": safe_get('customer.user_id'),
         "accountOwner.created": str(int(safe_get('customer.created_time').timestamp())) if safe_get(
@@ -250,21 +303,21 @@ def order_line_to_dict(order_line):
         "cartItems[].beneficiaries[].personalDetails.lastName": "",
         "cartItems[].beneficiaries[].phone[].phone": "",
 
-        "cartItems[].itemSpecificData.food.restaurantAddress.address1": safe_get('order_location.address_line1'),
-        "cartItems[].itemSpecificData.food.restaurantAddress.address2": safe_get('order_hdr_address.address2'),
-        "cartItems[].itemSpecificData.food.restaurantAddress.city": safe_get('order_location.city'),
+        "cartItems[].itemSpecificData.food.restaurantAddress.address1": '',
+        "cartItems[].itemSpecificData.food.restaurantAddress.address2": '',
+        "cartItems[].itemSpecificData.food.restaurantAddress.city": '',
         "cartItems[].itemSpecificData.food.restaurantAddress.country": "US",
-        "cartItems[].itemSpecificData.food.restaurantAddress.region": safe_get('order_location.state_code'),
-        "cartItems[].itemSpecificData.food.restaurantAddress.zip": safe_get('order_location.zip_code'),
-        "cartItems[].itemSpecificData.food.restaurantId": safe_get('order_restaurant.restaurant_id'),
-        "cartItems[].itemSpecificData.food.restaurantName": safe_get('order_restaurant.restaurant_name'),
+        "cartItems[].itemSpecificData.food.restaurantAddress.region": "",
+        "cartItems[].itemSpecificData.food.restaurantAddress.zip": "",
+        "cartItems[].itemSpecificData.food.restaurantId": "Blue Apron",
+        "cartItems[].itemSpecificData.food.restaurantName": "Blue Apron",
 
         "checkoutTime": str(int(safe_get('order.created_time').timestamp())) if safe_get('order.created_time') else "",
-        "connectionInformation.customerIP": "127.0.0.1",
+        "connectionInformation.customerIP": '127.0.0.1',
         "historicalData.fraud": "",
-        "historicalData.orderStatus": "",
+        "historicalData.orderStatus": get_historical_order_status(order_line.order, order_line.order_flags),
         "orderId": safe_get('order.id'),
-        "orderType": "WEB" if safe_get('order.order_channel') == "WEB" else "UNKNOWN",
+        "orderType": get_order_type(order_line.order),
 
         # Android Pay (Google Pay)
         "payment[].androidPay.bin": "",
@@ -330,22 +383,45 @@ def order_line_to_dict(order_line):
 
         # Total Amount
         "totalAmount.amountLocalCurrency": "",
-        "totalAmount.amountUSD": str(safe_get('order_charge.final_amount')) if safe_get(
-            'order_charge.final_amount') else "",
-        "totalAmount.currency": ""
+        "totalAmount.amountUSD": get_final_amount(order_line.order_charge),
+        "totalAmount.currency": 'USD'
     }
 
     return data
 
 
-def export_to_excel(order_lines, filename=None):
-    """将OrderLine列表导出为与CSV格式相同的Excel文件"""
-    if not filename:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"forter-export-{timestamp}.xlsx"
+def get_final_amount(orderCharge: OrderCharge):
+    if orderCharge is None or orderCharge.final_amount is None:
+        return "0"
+    return str(orderCharge.final_amount)
 
-    # 转换为字典列表
-    data = [order_line_to_dict(line) for line in order_lines]
+
+def get_order_type(order: Order):
+    if order.order_channel == 'BA_WEB' or order.order_channel == 'WEB':
+        return 'WEB'
+    elif order.order_channel == 'BA_APP' or order.order_channel == 'APP':
+        return 'MOBILE'
+
+    return "UNKNOWN"
+
+
+def get_historical_order_status(order: Order, order_flags: list) -> str:
+    if order.status == 'COMPLETE':
+        return 'COMPLETE'
+
+    elif order.status == 'CANCELED':
+        for flag in order_flags:
+            if flag.created_by == 'customer-service-site':
+                return 'CANCELED_BY_MERCHANT'
+
+        return 'CANCELED_BY_CUSTOMER'
+
+    else:
+        return ''
+
+
+def export_to_excel(lines, filename=None):
+    data = [order_line_to_dict(line) for line in lines]
     csv_columns = [
         'accountOwner.accountId', 'accountOwner.created', 'accountOwner.email',
         'accountOwner.firstName', 'accountOwner.fullName', 'accountOwner.lastName',
@@ -365,10 +441,11 @@ def export_to_excel(order_lines, filename=None):
         'cartItems[].itemSpecificData.food.restaurantName', 'checkoutTime', 'connectionInformation.customerIP',
         'historicalData.fraud', 'historicalData.orderStatus', 'orderId', 'orderType',
         'payment[].androidPay.bin', 'payment[].androidPay.expirationMonth', 'payment[].androidPay.expirationYear',
-        'payment[].androidPay.lastFourDigits', 'payment[].androidPay.nameOnCard', 'payment[].applePay.bin',
+        'payment[].androidPay.lastFourDigits', 'payment[].androidPay.nameOnCard', 'payment[].androidPay.token',
+        'payment[].applePay.bin',
         'payment[].applePay.expirationMonth', 'payment[].applePay.expirationYear',
         'payment[].applePay.lastFourDigits',
-        'payment[].applePay.nameOnCard', 'payment[].billingDetails.address.address1',
+        'payment[].applePay.nameOnCard', 'payment[].applePay.token', 'payment[].billingDetails.address.address1',
         'payment[].billingDetails.address.address2',
         'payment[].billingDetails.address.city', 'payment[].billingDetails.address.country',
         'payment[].billingDetails.address.region',
@@ -396,19 +473,22 @@ def export_to_excel(order_lines, filename=None):
         'totalAmount.amountUSD', 'totalAmount.currency'
     ]
 
-    # 创建DataFrame，保持CSV的列顺序
     if data:
-        # 使用CSV文件的列顺序
-
         df = pd.DataFrame(data, columns=csv_columns)
     else:
-        # 如果没有数据，创建空DataFrame但保持列顺序
         df = pd.DataFrame(columns=csv_columns)
 
-    # 保存为Excel文件
     df.to_csv(filename, index=False, encoding='utf-8')
-    print(f"数据已导出到: {filename}")
     return filename
 
 
-export()
+def main():
+    print("开始数据导出任务...")
+    conn = mysql.connector.connect(**db_config)
+    export_with_threadpool()
+    print("数据导出完成")
+    totalTime.sleep(36000)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: refund-exporter
+  namespace: prod-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: refund-exporter
+  template:
+    metadata:
+      labels:
+        app: refund-exporter
+    spec:
+      containers:
+      - name: exporter
+        image: handsomedyman/refund-exporter:latest
+        resources:
+          requests:
+            cpu: 100m
+            memory: 4G
+          limits:
+            cpu: 2000m
+            memory: 6G
+        env:
+        - name: DB_HOST
+          value: ""
+        - name: DB_USER
+          value: ""
+        - name: DB_PASSWORD
+          value: ""
+        - name: OUTPUT_DIR
+          value: ""
+        volumeMounts:
+        - name: export-volume
+          mountPath: /app/export_refund_history
+      volumes:
+      - name: export-volume
+        emptyDir: {}

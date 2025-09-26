@@ -51,12 +51,6 @@ class OrderCharge:
 
 
 @dataclass
-class OrderRestaurant:
-    restaurant_id: str
-    restaurant_name: str
-
-
-@dataclass
 class OrderPayment:
     id: str
     payment_method: str
@@ -84,19 +78,6 @@ class OrderAddress:
 
 
 @dataclass
-class OrderHDRAddress:
-    address2: Optional[str] = None
-
-
-@dataclass
-class OrderLocation:
-    address_line1: str
-    city: str
-    state_code: str
-    zip_code: str
-
-
-@dataclass
 class OrderIssue:
     id: str
     order_id: str
@@ -110,23 +91,58 @@ class OrderIssue:
 
 @dataclass
 class OrderIssueItem:
-    issue_quantity: Optional[int]
-    reason_number: str
+    id: str
+    order_issue_id: str
     issue_order_id: str
     issue_order_item_id: Optional[str]
     issue_category: str
+    issue_quantity: int
+    issue_source: str
+    reason_number: str
+
+
+@dataclass
+class OrderFlag:
+    order_id: str
+    action: str
+    created_by: str
 
 
 @dataclass
 class OrderLine:
     order: 'Order'
     customer: 'Customer'
+    order_flags: list
     order_item: 'OrderItem'
     order_charge_item: 'OrderChargeItem'
     order_charge: 'OrderCharge'
-    order_restaurant: 'OrderRestaurant'
     order_payments: list  # List[OrderPayment]
     stripe_payment_intents: list  # List[StripePaymentIntent]
     order_address: 'OrderAddress'
-    order_hdr_address: 'OrderHDRAddress'
-    order_location: 'OrderLocation'
+
+
+@dataclass
+class RefundLine:
+    order_id: str
+    event_time: int
+    event_id: str
+    product_id: str
+    item_name: str
+    quantity: int
+    category: str
+    item_type: str
+    price_amount_usd: Decimal
+    price_amount_local: Decimal
+    price_currency: str
+    updated_status: str
+    compensation_type: str
+    reason_category: str
+    internal_reason: str
+    return_method: str
+    return_condition: str
+    shipped_time: str
+    arrived_time: str
+    total_granted_amount: Decimal
+    replacement_order_id: str
+    shipping_refunded: Decimal
+    has_proof: str
