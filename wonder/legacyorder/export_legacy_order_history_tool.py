@@ -3,7 +3,7 @@ import os
 import time as totalTime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time, timedelta
-
+import logging, sys
 import mysql.connector
 import pandas as pd
 import pytz
@@ -15,26 +15,33 @@ from models import (
 )
 
 db_config = {
-    'host': os.getenv('DB_HOST', 'rfprodv2-flexible-wonder-db-replica-v4.mysql.database.azure.com'),
-    'user': os.getenv('DB_USER', 'datadog'),
-    'password': os.getenv('DB_PASSWORD', 'jPT8Q#gL9XLo%6ls'),
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
     'pool_name': 'custom_connection_pool',
     'pool_size': 10
 }
+
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    force=True
+)
 
 output_dir = os.getenv('OUTPUT_DIR', '/app/export_results')
 
 
 def export_single_day(current_date):
-    print(f"开始处理日期: {current_date.strftime('%Y-%m-%d')}")
+    logging.info(f"开始处理日期: {current_date.strftime('%Y-%m-%d')}")
 
     conn = None
     try:
-        print(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接已建立")
+        logging.info(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接已建立")
         conn = mysql.connector.connect(pool_name='custom_connection_pool')
         process_single_day(conn, current_date)
     except mysql.connector.Error as err:
-        print(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接失败: {err}")
+        logging.info(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接失败: {err}")
         return False
     finally:
         if conn:
@@ -57,6 +64,7 @@ def process_single_day(conn, current_date):
         end_of_day_utc = end_of_day_ny.astimezone(pytz.UTC)
         totalLines = []
         skip = 0
+        part = 1
 
         while True:
             with conn.cursor(dictionary=True) as cursor:
@@ -65,7 +73,7 @@ def process_single_day(conn, current_date):
                                         FROM `order`.orders
                                         WHERE created_time >= %s AND created_time <= %s
                                         AND brand_category = 'BLUE_APRON'
-                                        AND order_channel IN ('BA_APP', 'BA_WEB')
+                                        AND order_channel = 'BA_LEGACY'
                                         AND status in ('CANCELED', 'COMPLETE')
                                         LIMIT 100 OFFSET %s
                                     """
@@ -79,24 +87,32 @@ def process_single_day(conn, current_date):
                         lines = order_lines(Order(**row), cursor)
                         totalLines.extend(lines)
                     except Exception as e:
-                        print(f"{current_date.strftime('%Y-%m-%d')} - 处理订单错误: {e}")
+                        logging.info(f"{current_date.strftime('%Y-%m-%d')} - 处理订单错误: {e}")
 
                 skip += 100
 
+                if len(totalLines) >= 80000:
+                    filename = f"orders_{current_date.strftime('%Y-%m-%d')}_p{part}.csv"
+                    filepath = os.path.join(output_dir, filename)
+                    export_to_excel(totalLines, filepath)
+                    logging.info(f"{current_date.strftime('%Y-%m-%d')} - 导出完成: {len(totalLines)} 条记录")
+                    totalLines.clear()
+                    part+=1
+
         if totalLines:
-            filename = f"orders_{current_date.strftime('%Y-%m-%d')}.csv"
+            filename = f"orders_{current_date.strftime('%Y-%m-%d')}_p{part}.csv"
             filepath = os.path.join(output_dir, filename)
             export_to_excel(totalLines, filepath)
-            print(f"{current_date.strftime('%Y-%m-%d')} - 导出完成: {len(totalLines)} 条记录")
+            logging.info(f"{current_date.strftime('%Y-%m-%d')} - 导出完成: {len(totalLines)} 条记录")
         else:
-            print(f"{current_date.strftime('%Y-%m-%d')} - 无数据")
+            logging.info(f"{current_date.strftime('%Y-%m-%d')} - 无数据")
 
         e = totalTime.time()
-        print(f"{current_date.strftime('%Y-%m-%d')} - 处理完成, 耗时: {e - s: .2f} 秒")
+        logging.info(f"{current_date.strftime('%Y-%m-%d')} - 处理完成, 耗时: {e - s: .2f} 秒")
         return True
 
     except Exception as e:
-        print(f"{current_date.strftime('%Y-%m-%d')} - 处理过程中发生错误: {e}")
+        logging.info(f"{current_date.strftime('%Y-%m-%d')} - 处理过程中发生错误: {e}")
         return False
 
 
@@ -105,7 +121,7 @@ def export_with_threadpool():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    start_date = datetime(2025, 8, 11)
+    start_date = datetime(2025, 7, 8)
     end_date = datetime(2025, 9, 30)
 
     dates_to_process = []
@@ -114,7 +130,7 @@ def export_with_threadpool():
         dates_to_process.append(current_date)
         current_date += timedelta(days=1)
 
-    print(f"开始处理 {len(dates_to_process)} 天的数据")
+    logging.info(f"开始处理 {len(dates_to_process)} 天的数据")
 
     max_workers = min(5, len(dates_to_process))
     successful_days = 0
@@ -135,15 +151,15 @@ def export_with_threadpool():
                 else:
                     failed_days += 1
             except Exception as e:
-                print(f"{date.strftime('%Y-%m-%d')} - 线程执行异常: {e}")
+                logging.info(f"{date.strftime('%Y-%m-%d')} - 线程执行异常: {e}")
                 failed_days += 1
 
     end = totalTime.time()
-    print(f"\n=== 处理完成 ===")
-    print(f"总天数: {len(dates_to_process)}")
-    print(f"成功: {successful_days} 天")
-    print(f"失败: {failed_days} 天")
-    print(f"总耗时: {end - start: .2f} 秒")
+    logging.info(f"\n=== 处理完成 ===")
+    logging.info(f"总天数: {len(dates_to_process)}")
+    logging.info(f"成功: {successful_days} 天")
+    logging.info(f"失败: {failed_days} 天")
+    logging.info(f"总耗时: {end - start: .2f} 秒")
 
 
 def order_lines(order: Order, cursor):
@@ -483,10 +499,10 @@ def export_to_excel(lines, filename=None):
 
 
 def main():
-    print("开始数据导出任务...")
+    logging.info("开始数据导出任务...")
     mysql.connector.connect(**db_config)
     export_with_threadpool()
-    print("数据导出完成")
+    logging.info("数据导出完成")
     totalTime.sleep(36000)
 
 

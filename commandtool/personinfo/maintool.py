@@ -8,7 +8,7 @@ def main():
     parser = argparse.ArgumentParser(description='这是一个命令行参数解析示例。')
 
     # 添加命令行参数
-    parser.add_argument('action')
+    # parser.add_argument('action')
     parser.add_argument('-k', '--key')
     parser.add_argument('-v', '--value')
 

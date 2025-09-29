@@ -16,6 +16,7 @@ class Parent:  # 定义父类
 
 class Child(Parent):  # 定义子类
     def __init__(self):
+        super().__init__()
         print("调用子类构造方法")
 
     def childMethod(self):

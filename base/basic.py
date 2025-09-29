@@ -70,6 +70,7 @@ dic = dict()
 dic[1] = 'one'
 print(dic)
 
+
 for key, value in dic.items():
     print("dic content")
     print(key)

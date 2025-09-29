@@ -1,0 +1,4 @@
+
+kubectl exec <pod-name> -- tar czf /tmp/export_results.tar.gz -C /app/export_results .
+kubectl cp <pod-name>:/tmp/export_results.tar.gz ./export_results.tar.gz
+tar xzf export_results.tar.gz
