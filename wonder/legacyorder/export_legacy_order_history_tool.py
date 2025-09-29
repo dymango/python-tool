@@ -29,7 +29,7 @@ logging.basicConfig(
     force=True
 )
 
-output_dir = os.getenv('OUTPUT_DIR', '/app/export_results')
+output_dir = os.getenv('OUTPUT_DIR', '~/Desktop/app/export_results')
 
 
 def export_single_day(current_date):
@@ -39,9 +39,12 @@ def export_single_day(current_date):
     try:
         logging.info(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接已建立")
         conn = mysql.connector.connect(pool_name='custom_connection_pool')
-        process_single_day(conn, current_date)
+        return process_single_day(conn, current_date)
     except mysql.connector.Error as err:
         logging.info(f"{current_date.strftime('%Y-%m-%d')} - 数据库连接失败: {err}")
+        return False
+    except Exception as e:
+        logging.info(f"{current_date.strftime('%Y-%m-%d')} - export_single_day error: {e}")
         return False
     finally:
         if conn:
@@ -87,7 +90,7 @@ def process_single_day(conn, current_date):
                         lines = order_lines(Order(**row), cursor)
                         totalLines.extend(lines)
                     except Exception as e:
-                        logging.info(f"{current_date.strftime('%Y-%m-%d')} - 处理订单错误: {e}")
+                        logging.exception("发生异常")
 
                 skip += 100
 
@@ -97,7 +100,7 @@ def process_single_day(conn, current_date):
                     export_to_excel(totalLines, filepath)
                     logging.info(f"{current_date.strftime('%Y-%m-%d')} - 导出完成: {len(totalLines)} 条记录")
                     totalLines.clear()
-                    part+=1
+                    part += 1
 
         if totalLines:
             filename = f"orders_{current_date.strftime('%Y-%m-%d')}_p{part}.csv"
@@ -121,8 +124,8 @@ def export_with_threadpool():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    start_date = datetime(2025, 7, 8)
-    end_date = datetime(2025, 9, 30)
+    start_date = datetime(2025, 7, 14)
+    end_date = datetime(2025, 7, 15)
 
     dates_to_process = []
     current_date = start_date
@@ -237,7 +240,10 @@ def order_lines(order: Order, cursor):
         order_flags = [OrderFlag(**row) for row in flags_data]
 
     for item in order_items:
-        charge_item = next(oci for oci in order_charge_items if oci.order_item_id == item.id)
+        charge_item = []
+        if order_charge_items:
+            charge_item = next(oci for oci in order_charge_items if oci.order_item_id == item.id)
+
         line = OrderLine(
             order=order,
             customer=customer,

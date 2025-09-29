@@ -2,3 +2,5 @@
 kubectl exec <pod-name> -- tar czf /tmp/export_results.tar.gz -C /app/export_results .
 kubectl cp <pod-name>:/tmp/export_results.tar.gz ./export_results.tar.gz
 tar xzf export_results.tar.gz
+
+kubectl cp -n uat-consumer legacy-order-exporter-7f6c54fcc-xt9hc:/app/export_results/orders_2025-07-08_p1.csv ./orders_2025-07-08_p1.csv
