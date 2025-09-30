@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: legacy-order-exporter
-  namespace: uat-consumer
+  namespace: prod-consumer
 spec:
   replicas: 1
   selector:
@@ -27,11 +27,11 @@ spec:
         - name: DB_HOST
           value: ""
         - name: DB_USER
-          value: "datadog"
+          value: ""
         - name: DB_PASSWORD
           value: ""
         - name: OUTPUT_DIR
-          value: ""
+          value: "/app/export_results"
         volumeMounts:
         - name: export-volume
           mountPath: /app/export_results

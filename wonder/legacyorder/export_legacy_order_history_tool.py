@@ -1,9 +1,11 @@
 # order_exporter.py
+import logging
 import os
+import sys
 import time as totalTime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time, timedelta
-import logging, sys
+
 import mysql.connector
 import pandas as pd
 import pytz
@@ -29,7 +31,7 @@ logging.basicConfig(
     force=True
 )
 
-output_dir = os.getenv('OUTPUT_DIR', '~/Desktop/app/export_results')
+output_dir = os.getenv('OUTPUT_DIR', '/app/export_results')
 
 
 def export_single_day(current_date):
@@ -98,7 +100,7 @@ def process_single_day(conn, current_date):
                     filename = f"orders_{current_date.strftime('%Y-%m-%d')}_p{part}.csv"
                     filepath = os.path.join(output_dir, filename)
                     export_to_excel(totalLines, filepath)
-                    logging.info(f"{current_date.strftime('%Y-%m-%d')} - 导出完成: {len(totalLines)} 条记录")
+                    logging.info(f"{current_date.strftime('%Y-%m-%d')}_p{part} - 导出完成: {len(totalLines)} 条记录")
                     totalLines.clear()
                     part += 1
 
@@ -124,8 +126,8 @@ def export_with_threadpool():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    start_date = datetime(2025, 7, 14)
-    end_date = datetime(2025, 7, 15)
+    start_date = datetime(2025, 7, 1)
+    end_date = datetime(2025, 9, 30)    
 
     dates_to_process = []
     current_date = start_date
