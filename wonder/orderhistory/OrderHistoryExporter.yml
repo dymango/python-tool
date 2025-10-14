@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: order-exporter
-  namespace: dev-consumer
+  namespace: prod-consumer
 spec:
   replicas: 1
   selector:
@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: exporter
-        image: handsomedyman/data-exporter:latest
+        image: handsomedyman/order-exporter:latest
         resources:
           requests:
             cpu: 100m
@@ -31,7 +31,7 @@ spec:
         - name: DB_PASSWORD
           value: ""
         - name: OUTPUT_DIR
-          value: ""
+          value: "/app/export_results"
         volumeMounts:
         - name: export-volume
           mountPath: /app/export_results
