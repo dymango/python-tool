@@ -74,7 +74,7 @@ def process_single_day(conn, current_date):
         while True:
             with conn.cursor(dictionary=True) as cursor:
                 searchOrderSql = """
-                                    SELECT id, user_id, order_channel, dining_option, created_time, status, remake_ref_order_id
+                                    SELECT id, user_id, order_channel, dining_option, order_date, created_time, status, remake_ref_order_id
                                         FROM `order`.orders
                                         WHERE created_time >= %s AND created_time <= %s
                                         AND brand_category = 'BLUE_APRON'
@@ -137,7 +137,7 @@ def export_with_threadpool():
 
     logging.info(f"开始处理 {len(dates_to_process)} 天的数据")
 
-    max_workers = min(5, len(dates_to_process))
+    max_workers = min(8, len(dates_to_process))
     successful_days = 0
     failed_days = 0
 
@@ -336,7 +336,7 @@ def order_line_to_dict(order_line):
         "cartItems[].itemSpecificData.food.restaurantId": "Blue Apron",
         "cartItems[].itemSpecificData.food.restaurantName": "Blue Apron",
 
-        "checkoutTime": str(int(safe_get('order.created_time').timestamp())) if safe_get('order.created_time') else "",
+        "checkoutTime": str(int(safe_get('order.order_date').timestamp())) if safe_get('order.order_date') else "",
         "connectionInformation.customerIP": '127.0.0.1',
         "historicalData.fraud": "",
         "historicalData.orderStatus": get_historical_order_status(order_line.order, order_line.order_flags),
@@ -511,7 +511,7 @@ def main():
     mysql.connector.connect(**db_config)
     export_with_threadpool()
     logging.info("数据导出完成")
-    totalTime.sleep(36000)
+    totalTime.sleep(86400)
 
 
 if __name__ == "__main__":

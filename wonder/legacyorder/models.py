@@ -11,6 +11,7 @@ class Order:
     user_id: str
     order_channel: str
     dining_option: str
+    order_date: datetime
     created_time: datetime
     status: str
     remake_ref_order_id: Optional[str] = None

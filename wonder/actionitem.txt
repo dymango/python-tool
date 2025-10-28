@@ -1,5 +1,5 @@
-docker build -t your-registry/data-exporter:latest .
-docker push your-registry/data-exporter:latest
+docker build -t handsomedyman/legacy-order-exporter:latest .
+docker push handsomedyman/legacy-order-exporter:latest
 kubectl exec <pod-name> -- tar czf /tmp/export_results.tar.gz -C /app/export_results .
 kubectl cp <pod-name>:/tmp/export_results.tar.gz ./export_legacy_order_results.tar.gz
 tar xzf export_results.tar.gz
