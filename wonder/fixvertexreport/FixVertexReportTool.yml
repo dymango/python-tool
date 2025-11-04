@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fix-vertex-report-tool-v2
+  namespace: uat-consumer
+spec:
+  containers:
+    - name: python
+      image: python:3.12-slim
+      command: [ "sleep", "infinity" ]  # 保持容器常驻
+  restartPolicy: Always

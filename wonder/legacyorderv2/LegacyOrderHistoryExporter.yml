@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legacy-order-exporter
+  namespace: prod-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: legacy-order-exporter
+  template:
+    metadata:
+      labels:
+        app: legacy-order-exporter
+    spec:
+      containers:
+      - name: exporter
+        image: handsomedyman/legacy-order-exporter:latest
+        resources:
+          requests:
+            cpu: 100m
+            memory: 4G
+          limits:
+            cpu: 2000m
+            memory: 8G
+        env:
+        - name: DB_HOST
+          value: "rfprodv2-flexible-wonder-db-replica-v4.mysql.database.azure.com"
+        - name: DB_USER
+          value: ""
+        - name: DB_PASSWORD
+          value: ""
+        - name: OUTPUT_DIR
+          value: "/app/export_results"
+        volumeMounts:
+        - name: export-volume
+          mountPath: /app/export_results
+      volumes:
+      - name: export-volume
+        emptyDir: {}

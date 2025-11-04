@@ -1,13 +1,25 @@
 docker build -t handsomedyman/legacy-order-exporter:latest .
-docker push handsomedyman/legacy-order-exporter:latest
+docker push handsomedyman/legacy-order-exporter-v2:latest
 kubectl exec <pod-name> -- tar czf /tmp/export_results.tar.gz -C /app/export_results .
-kubectl cp <pod-name>:/tmp/export_results.tar.gz ./export_legacy_order_results.tar.gz
+kubectl cp -n prod-consumer legacy-order-exporter-v2-68c45f9c7b-bnpln:/tmp/legacy_order.tar.gz ./legacy_order_new.tar.gz
+tar xzf legacy_order_new.tar.gz
+
+kubectl cp -n prod-consumer legacy-order-exporter-5757d88576-bhqj8:/app/export_results/orders_2025-08-11_p1.csv /app/export_legacy_order_results/orders_2025-08-11_p1.csv
+
+kubectl cp -n prod-consumer legacy-order-exporter-5757d88576-bhqj8:/tmp/export_results.tar.gz ./export_results.tar.gz
+
+
+kubectl exec legacy-order-exporter-v2-68c45f9c7b-bnpln -n prod-consumer -- tar czf /tmp/export_legacy_order.tar.gz -C /app/export_results .
+kubectl cp -n prod-consumer legacy-order-exporter-v2-68c45f9c7b-bnpln:/tmp/legacy_order.tar.gz ./legacy_order_new.tar.gz
+
+kubectl cp legacy-order-exporter-5757d88576-bhqj8:/tmp/legacy_order.tar.gz ./legacy_order_new.tar.gz
 tar xzf export_results.tar.gz
 
-kubectl cp -n prod-consumer legacy-order-exporter-57c574c4f6-5cs99:/app/export_results/orders_2025-08-11_p1.csv /app/export_legacy_order_results/orders_2025-08-11_p1.csv
+kubectl exec legacy-order-exporter-v2-68c45f9c7b-bnpln -n prod-consumer -- tar czf /tmp/export_legacy_order.tar.gz -C /app/export_results .
+ kubectl exec -n prod-consumer legacy-order-exporter-v2-68c45f9c7b-bnpln -- tar czf - /app/export_results > legacy_order_new.tar.gz
 
-kubectl cp -n prod-consumer legacy-order-exporter-57c574c4f6-5cs99:/tmp/export_results.tar.gz ./export_results.tar.gz
+ kubectl exec -n prod-consumer legacy-order-exporter-v2-68c45f9c7b-bnpln -- tar cf - /app/export_results  > legacy_order_new.tar.gz
 
+ kubectl exec -n prod-consumer legacy-order-exporter-v2-68c45f9c7b-bnpln -- tar czf /tmp/legacy_order.tar.gz -C /app/export_results .
 
-kubectl exec refund-exporter-5fff4c544d-stwdb -n prod-consumer -- tar czf /tmp/export_results.tar.gz -C /app/export_refund_history .
-kubectl cp -n prod-consumer refund-exporter-5fff4c544d-stwdb:/tmp/export_results.tar.gz ./export_refund_history_results.tar.gz
+ kubectl exec -n prod-consumer legacy-order-exporter-v2-68c45f9c7b-bnpln --  cat /tmp/legacy_order.tar.gz > legacy_order_new.tar.gz

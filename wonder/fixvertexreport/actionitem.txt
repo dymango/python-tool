@@ -1,0 +1,4 @@
+C:\Work\PyProject\python-tool\wonder\fixvertexreport\vertex_report_fix_script.py
+
+kubectl -n prod-consumer cp .\vertex_report_fix_script.py fix-vertex-report-tool:/tmp/vertex_report_fix_script.py
+python vertex_report_fix_script.py
