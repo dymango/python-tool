@@ -132,7 +132,7 @@ class CalculateTaxRequest:
 @dataclass
 class CalculateTaxResult:
     documentDate: str
-    lineItems: List['LineItem']
+    lineItems: List['CalculateTaxResult.LineItem']
     totalTax: float
 
     @dataclass
@@ -160,7 +160,6 @@ class CalculateTaxResult:
         calculationRuleId: Optional[str] = None
 
 
-
 # 常量
 class TaxConstants:
     BA_DELIVERY_FEE_CATEGORY_ID = "ba_delivery_fee_category"
@@ -174,3 +173,7 @@ class FeeType:
     SERVICE_FEE = "SERVICE_FEE"
     DELIVERY_FEE = "DELIVERY_FEE"
     FAST_PASS_FEE = "FAST_PASS_FEE"
+
+
+class TaxCategoryIds:
+    BA_DELIVERY_FEE = "TC-BA_DELIVERY_FEE"

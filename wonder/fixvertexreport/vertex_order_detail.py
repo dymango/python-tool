@@ -560,7 +560,7 @@ class TaxDetailService:
 
 # 使用示例
 def main():
-    order_id = "10724a02-6f95-4612-96f6-00c095c16561"
+    order_id = "2e07cab0-aa36-4794-92d9-046ee5c11e0e"
 
     with TaxDetailService() as service:
         tax_detail = service.get_tax_detail(order_id)

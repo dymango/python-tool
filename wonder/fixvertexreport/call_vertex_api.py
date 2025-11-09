@@ -11,8 +11,7 @@ from model import *
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-TOKEN = 'eyJ4NXQjUzI1NiI6IkJoVmtSbk5ZODgyY3BNTFhGbkN4SzRNbXA3eVJlR25zQUd3MzBDclVfR2siLCJraWQiOiJhMDEzYTI5MC1hYTc2LTRmYzItOGQzNi1iN2ZjZGJlNjMxZmMiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIwMzc2ZWNjYTViMzQudmVydGV4aW5jLmNvbSIsImF1ZCI6IiIsIm5iZiI6MTc2MjUxNjk5NiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDk1L29zZXJpZXMtYXV0aCIsImV4cCI6MTc2MjUxODc5NiwiaWF0IjoxNzYyNTE2OTk2LCJ1c2VySWQiOjM3LCJqdGkiOiI5OTM0YmJmMC1mN2VlLTRhMzAtOGViYy01NzE0ZDAzZTA5YWEifQ.SoGD8B8ciPZrjslI3rOgt8ysLO3aThPZgc9eZ0hPsxvsmqGWsxCwraV3tkJjM5FbbZNd0gOVWwoTXunONaLzaaphgcz2TldMxNqmMlzZjHv7gGes8odSzQtun3ryCBg6jF70WgkZOSrSIIqQUcPjU1X0BttY92rFxSQqjdzsQKVY0iQohQ7xhuGsoDpH63ATF_0G1OC6ERESTS-fUzyAhI8vqG-huYH5E9DdG7-9K2_qQcuHRW0f84lStqUsJZgQtrxYdFsUFhWT_WlpL5ptkhs8kxcqLULigBSKyl8OytkRdW1eQFr7VPP60TJzNIiXaraz-HD09sPw_KhclKHfEg'
-
+TOKEN = 'eyJ4NXQjUzI1NiI6IkJoVmtSbk5ZODgyY3BNTFhGbkN4SzRNbXA3eVJlR25zQUd3MzBDclVfR2siLCJraWQiOiJhMDEzYTI5MC1hYTc2LTRmYzItOGQzNi1iN2ZjZGJlNjMxZmMiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIwMzc2ZWNjYTViMzQudmVydGV4aW5jLmNvbSIsImF1ZCI6IiIsIm5iZiI6MTc2MjY3ODQyNywiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDk1L29zZXJpZXMtYXV0aCIsImV4cCI6MTc2MjY4MDIyNywiaWF0IjoxNzYyNjc4NDI3LCJ1c2VySWQiOjM3LCJqdGkiOiJlY2JhNTM3MS00NzQ0LTQ0ZTgtOThlOC00MzExNTk0YjM3NzQifQ.dW-nSb-n8v7blPSGeeqIQvcB6k4SeVB26sUBO7WAmn7thfffZOENXoiS3KDdIijhPYQM5PGQsLTbcl9BZXDfWQvkrpHTg5cka-1io4uDZMACquvimFni0ghwT2G0meMRvoSp-Jk-cTJaOSYFMPiO4508sS4Qeq7uL2-qYEzQYNDSZf_IrREWKHJWvWx1PRUq8DhzPEQYtyVmcTAA4ZMosMwURYw-b5ChBiUIEEXRGPJsPUxhnc_hxcP9K5Jp4uRROoi53GUoyK2ONTb-2bbxmdM0ut-Zc4GKge7N1E5sYyP7H7mh141g_-AaRdQDdUZvJBYENBcYuItP3C06bV29lg'
 
 # 配置
 class VertexConfig:
@@ -182,7 +181,7 @@ class VertexService:
         """获取文档编号"""
         if brand_category == "WONDER_HDR":
             return orderNumber
-        return orderNumber if tax_detail.schedule_type == "ONE_TIME_PURCHASE" else orderId
+        return orderNumber if tax_detail.schedule_type.name == "ONE_TIME_PURCHASE" else orderId
 
     def get_location_code(self, brand_category, tax_detail) -> Optional[str]:
         """获取位置代码"""
@@ -494,6 +493,7 @@ class VertexService:
             if param.lineItems:
                 result = self.report_tax(param)
                 logger.info(f"Successfully reported tax to Vertex for document {documentNumber}")
+                logger.info(f"result body{result.__dict__}")
                 publisher = send_msg_to_order_service.VertexReportEventMessagePublisher()
                 publisher.publish_vertex_invoice_report_event_message(documentNumber, tax_detail, brandCategory, result)
                 return result

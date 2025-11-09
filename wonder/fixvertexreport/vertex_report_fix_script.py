@@ -19,9 +19,9 @@ ES_SIZE = 10
 # ===== 认证部分 =====
 # uat  YnV3a2JvWUJ0Z0drVWdYMl9JNWM6ZzJBNmpTc01TVXVPTDB1Ui0wQ0dlQQ==   rRSczeTFcz
 # prod  TUJSUWZZWUJXTDc2a2ExUHVfMlg6Y1pLd01wY1pW1wY1pST1ctU2RzTFRUMVR4dw==   BxKQ3W2tPtfwXnjx
-ES_API_KEY = "YnV3a2JvWUJ0Z0drVWdYMl9JNWM6ZzJBNmpTc01TVXVPTDB1Ui0wQ0dlQQ=="
+ES_API_KEY = "TUJSUWZZWUJXTDc2a2ExUHVfMlg6Y1pLd01wY1pW1wY1pST1ctU2RzTFRUMVR4dw=="
 ES_USER = "kibana"
-ES_PASS = "rRSczeTFcz"
+ES_PASS = "BxKQ3W2tPtfwXnjx"
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -187,7 +187,7 @@ def get_message_and_send_to_tax_service(id: str, order_id: str, event: str):
         if matches:
             try:
                 json_data = json.loads(matches[0])
-                # send_to_tax_service(order_id, json_data)
+                send_to_tax_service(order_id, json_data)
                 logger.info(f"send data to tax service: {fixed_log_count}")
                 fixed_log_count += 1
             except json.JSONDecodeError as e:
@@ -199,7 +199,7 @@ def get_message_and_send_to_tax_service(id: str, order_id: str, event: str):
 
 
 def send_to_tax_service(order_id: str, payload: dict):
-    TAX_SERVICE_URL = "https://tax-service.uat-consumer.svc.cluster.local/_sys/kafka/topic/oms-order-event/key/{order_id}/handle"
+    TAX_SERVICE_URL = "https://tax-service.prod-consumer.svc.cluster.local/_sys/kafka/topic/oms-order-event/key/{order_id}/handle"
     TAX_SERVICE_TIMEOUT = 20
     url = TAX_SERVICE_URL.format(order_id=order_id)
     try:
