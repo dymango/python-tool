@@ -844,7 +844,6 @@ def main():
         tax_detail = service.get_tax_detail(order_id)
         if tax_detail:
             logger.info(f"Successfully built tax detail for order {order_id}")
-            logger.info(tax_detail)
             tax_detail_dict = tax_detail.__dict__.copy()
 
             # 简单的JSON序列化

@@ -11,18 +11,18 @@ from model import *
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-TOKEN = 'eyJ4NXQjUzI1NiI6IkJoVmtSbk5ZODgyY3BNTFhGbkN4SzRNbXA3eVJlR25zQUd3MzBDclVfR2siLCJraWQiOiJhMDEzYTI5MC1hYTc2LTRmYzItOGQzNi1iN2ZjZGJlNjMxZmMiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIwMzc2ZWNjYTViMzQudmVydGV4aW5jLmNvbSIsImF1ZCI6IiIsIm5iZiI6MTc2MjY3ODQyNywiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDk1L29zZXJpZXMtYXV0aCIsImV4cCI6MTc2MjY4MDIyNywiaWF0IjoxNzYyNjc4NDI3LCJ1c2VySWQiOjM3LCJqdGkiOiJlY2JhNTM3MS00NzQ0LTQ0ZTgtOThlOC00MzExNTk0YjM3NzQifQ.dW-nSb-n8v7blPSGeeqIQvcB6k4SeVB26sUBO7WAmn7thfffZOENXoiS3KDdIijhPYQM5PGQsLTbcl9BZXDfWQvkrpHTg5cka-1io4uDZMACquvimFni0ghwT2G0meMRvoSp-Jk-cTJaOSYFMPiO4508sS4Qeq7uL2-qYEzQYNDSZf_IrREWKHJWvWx1PRUq8DhzPEQYtyVmcTAA4ZMosMwURYw-b5ChBiUIEEXRGPJsPUxhnc_hxcP9K5Jp4uRROoi53GUoyK2ONTb-2bbxmdM0ut-Zc4GKge7N1E5sYyP7H7mh141g_-AaRdQDdUZvJBYENBcYuItP3C06bV29lg'
+TOKEN = 'eyJ4NXQjUzI1NiI6IkJoVmtSbk5ZODgyY3BNTFhGbkN4SzRNbXA3eVJlR25zQUd3MzBDclVfR2siLCJraWQiOiJhMDEzYTI5MC1hYTc2LTRmYzItOGQzNi1iN2ZjZGJlNjMxZmMiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiI5ZWY1MWMxNjEwZWMudmVydGV4aW5jLmNvbSIsImF1ZCI6IiIsIm5iZiI6MTc2MjcxMDIxMiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDk1L29zZXJpZXMtYXV0aCIsImV4cCI6MTc2MjcxMjAxMiwiaWF0IjoxNzYyNzEwMjEyLCJ1c2VySWQiOjQwLCJqdGkiOiJjODUzM2Q1OC03YjIzLTRjODktYjM4Ny05NDQ1MjEwYWJhNDEifQ.i6gTzF4ralAHWnF1m3wCEi4-SY2_5HRFPNNDqIt2jfaM4k3-xzR9a1Ck-zayD63NofwM63-ZK8o-iRnTc5ko7jlYItpRNUczTjTbaega-YScBA97t7Fw840ItWjwIyHXaAtdI_npANZVnlrgcPmppFPRkmSgub3_JD4JU92IeOJccziZSMOfUvAJBz0UpcWM154GPa1JmUIhCq3W-4xd3ig37O8k5JfTiQXiYdhxmajJEHvPGHAC7CaRo_82CdSZGuS69mg-VsB41Pv2ojfUnjrQue_zgxUh3N94YCPLESevZYrpjWSq5tSg6rnBNMj6ZjY-MFFdyKxW0mPk3o5KtA'
 
 # 配置
 class VertexConfig:
     BASE_URL = "https://grubhub2.na1.ondemand.vertexinc.com"
-    CLIENT_ID = "0376ecca5b34.vertexinc.com"
-    CLIENT_SECRET = "31b956be89fb1780d124218d36c430358941f62ab349e89b3e3a7aac72932bab"
+    CLIENT_ID = "9ef51c1610ec.vertexinc.com"
+    CLIENT_SECRET = "e28e4b7ee7c8e69486d5a75830723843183be6b3412b9f0f3b95037f1266880d"
     TRANSACTION_URL = f"{BASE_URL}/vertex-ws/v2/supplies"
 
 
 db_config = {
-    'host': 'ftiuat-flexible-consumer-db.mysql.database.azure.com',
+    'host': 'rfprodv2-flexible-wonder-db-replica-v4.mysql.database.azure.com',
     'user': 'datadog',
     'password': 'jPT8Q#gL9XLo%6ls',
     'database': 'tax'
@@ -142,9 +142,6 @@ class VertexAPIClient:
         try:
             # 直接使用dataclass的__dict__，因为字段名已经是驼峰命名
             request_dict = self._dataclass_to_camel_dict(request)
-            logger.info("Sending request to Vertex API:")
-            logger.info(json.dumps(request_dict, indent=2))
-
             response = self.session.post(url, json=request_dict, headers=headers)
             response.raise_for_status()
             return response.json()
@@ -493,7 +490,6 @@ class VertexService:
             if param.lineItems:
                 result = self.report_tax(param)
                 logger.info(f"Successfully reported tax to Vertex for document {documentNumber}")
-                logger.info(f"result body{result.__dict__}")
                 publisher = send_msg_to_order_service.VertexReportEventMessagePublisher()
                 publisher.publish_vertex_invoice_report_event_message(documentNumber, tax_detail, brandCategory, result)
                 return result
@@ -532,8 +528,6 @@ def report_main(orderId: str, userId: str, brandCategory: str, tax_detail: OMSOr
 
             if result:
                 logger.info("✅ Successfully reported order to Vertex")
-                print(f"Total tax: {result.totalTax}")
-                logger.info(result.__dict__)
             else:
                 logger.error("❌ Failed to report order to Vertex")
 

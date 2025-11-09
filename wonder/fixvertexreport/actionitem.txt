@@ -1,13 +1,15 @@
 C:\Work\PyProject\python-tool\wonder\fixvertexreport\vertex_report_fix_script.py
 
-kubectl -n prod-consumer cp .\vertex_report_fix_script.py fix-vertex-report-tool:/tmp/vertex_report_fix_script.py
+kubectl -n prod-consumer cp ./vertex_report_fix_script.py fix-vertex-report-tool:/tmp/vertex_report_fix_script.py
 python vertex_report_fix_script.py
 
 kubectl cp -n prod-consumer fix-vertex-report-tool:/tmp/failed_orders.xlsx ./failed_orders.xlsx
 
 
-kubectl -n uat-consumer cp ./vertex_order_detail.py fix-vertex-report-tool-v2:/tmp/vertex_order_detail.py
-kubectl -n uat-consumer cp ./vertex_order_detail_model.py fix-vertex-report-tool-v2:/tmp/vvertex_order_detail_model.py
-kubectl -n uat-consumer cp ./call_vertex_api.py fix-vertex-report-tool-v2:/tmp/call_vertex_api.py
-kubectl -n uat-consumer cp ./send_msg_to_order_service.py fix-vertex-report-tool-v2:/tmp/send_msg_to_order_service.py
-kubectl -n uat-consumer cp ./model.py fix-vertex-report-tool-v2:/tmp/model.py
+kubectl -n prod-consumer cp ./vertex_order_detail.py fix-vertex-report-tool:/tmp/vertex_order_detail.py
+kubectl -n prod-consumer cp ./vertex_order_detail_model.py fix-vertex-report-tool:/tmp/vertex_order_detail_model.py
+kubectl -n prod-consumer cp ./call_vertex_api.py fix-vertex-report-tool:/tmp/call_vertex_api.py
+kubectl -n prod-consumer cp ./send_msg_to_order_service.py fix-vertex-report-tool:/tmp/send_msg_to_order_service.py
+kubectl -n prod-consumer cp ./model.py fix-vertex-report-tool:/tmp/model.py
+
+kubectl cp -n prod-consumer fix-vertex-report-tool:/tmp/failed_orders.xlsx ./failed_orders1030.xlsx

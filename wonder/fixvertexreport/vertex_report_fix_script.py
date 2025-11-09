@@ -33,6 +33,8 @@ order_list = []
 fixed_log_count = 0
 ignore_orders = []
 failed_orders = []
+success_orders = []
+failed_order_ids = []
 
 
 def make_auth_headers():
@@ -157,9 +159,11 @@ def main():
                 ignore_orders.append(order_id)
 
     logger.info(f"done.fetch: {total_fetched},  total: {len(order_list)}, {fixed_log_count} vertex fixed.")
-    logger.info(f"ignore orders: {ignore_orders}")
-    logger.info(f"failed orders: {failed_orders}")
+    # logger.info(f"ignore orders: {ignore_orders}")
+    logger.info(f"success orders: {success_orders}")
+    # logger.info(f"failed orders: {failed_orders}")
     logger.info(f"failed orders count: {len(failed_orders)}")
+    logger.info(f"failed orderids: {failed_order_ids}")
 
     # ✅ 输出到 Excel
     if failed_orders:
@@ -187,15 +191,19 @@ def get_message_and_send_to_tax_service(id: str, order_id: str, event: str):
         if matches:
             try:
                 json_data = json.loads(matches[0])
-                send_to_tax_service(order_id, json_data)
+                # send_to_tax_service(order_id, json_data)
                 logger.info(f"send data to tax service: {fixed_log_count}")
                 fixed_log_count += 1
+                success_orders.append(order_id)
+                # time.sleep(0.1)
             except json.JSONDecodeError as e:
                 logger.info(f"JSON解析错误: {e}")
-                failed_orders.append({"order_id": order_id, "event": event})  # ✅ 修正为字典格式
+                failed_orders.append({"order_id": order_id, "event": event})  # ✅ 修正为字典格式'
+                failed_order_ids.append(order_id)
         else:
             logger.info("JSON解析无数据")
             failed_orders.append({"order_id": order_id, "event": event})  # ✅ 补充
+            failed_order_ids.append(order_id)
 
 
 def send_to_tax_service(order_id: str, payload: dict):

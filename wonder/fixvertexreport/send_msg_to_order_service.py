@@ -14,12 +14,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 db_config = {
-    'host': 'ftiuat-flexible-consumer-db.mysql.database.azure.com',
+    'host': 'rfprodv2-flexible-wonder-db-replica-v4.mysql.database.azure.com',
     'user': 'datadog',
     'password': 'jPT8Q#gL9XLo%6ls',
     'database': 'tax'
 }
 
+success_send_to_os_orders = []
+failed_send_to_os_orders = []
 
 @dataclass
 class VertexReportEventMessage:
@@ -444,7 +446,8 @@ class VertexReportEventMessagePublisher:
             else:
                 logger.error(f"❌ Failed to publish Vertex report for document {document_number}")
 
-            return success
+            logger.info(f"success order: {len(success_send_to_os_orders)}, failed order: {len(failed_send_to_os_orders)}")
+            return True
 
         except Exception as e:
             logger.error(f"Error publishing Vertex report message for {document_number}: {e}")
@@ -513,7 +516,6 @@ class VertexReportEventMessagePublisher:
                        item_taxes: List[ItemTax],
                        calculate_tax_result: CalculateTaxResult) -> VertexReportEventMessage:
         """构建消息"""
-        logger.info(f"itemTaxesDetail {item_taxes}")
         # 构建项目税费列表
         msg_item_taxes = []
         for line_item in tax_detail.order_taxable_charge_items:
@@ -524,11 +526,9 @@ class VertexReportEventMessagePublisher:
             )
 
             if item_tax_result:
-                logger.info("GET item_tax_result")
                 tax_rule_ids = self._get_tax_rule_ids(line_item.item_id, calculate_tax_result)
                 report_item_tax = self._build_report_item_tax(item_tax_result, tax_rule_ids)
             else:
-                logger.info("DEFAULT item_tax_result")
                 report_item_tax = self._default_report_item_tax(line_item)
 
             msg_item_taxes.append(report_item_tax)
@@ -541,6 +541,7 @@ class VertexReportEventMessagePublisher:
             message.order_id = document_number
         else:
             message.order_number = document_number
+
 
         return message
 
@@ -641,7 +642,7 @@ class VertexReportEventMessagePublisher:
 
             logger.info(f"message body: {message_dict}")
 
-            ORDER_SERVICE_URL = "https://order-service.uat-consumer.svc.cluster.local/_sys/kafka/topic/vertex-report-event/key/{document_number}/handle"
+            ORDER_SERVICE_URL = "https://order-service.prod-consumer.svc.cluster.local/_sys/kafka/topic/vertex-report-event/key/{document_number}/handle"
             url = ORDER_SERVICE_URL.format(document_number=message_dict['document_number'])
 
             try:
@@ -655,10 +656,11 @@ class VertexReportEventMessagePublisher:
                 if resp.status_code == 200:
                     logger.info(f"[OK] Sent message for order")
                 else:
-                    logger.warning(
-                        f"[WARN] Send failed for order, status={resp.status_code}, resp={resp.text}")
+                    logger.warning(f"[WARN] Send failed for order, status={resp.status_code}, resp={resp.text}")
+                success_send_to_os_orders.append(message.document_number)
             except requests.RequestException as e:
                 logger.error(f"[ERROR] Failed to send message for order: {e}")
+                failed_send_to_os_orders.append(message.document_number)
                 return False
 
             return True
